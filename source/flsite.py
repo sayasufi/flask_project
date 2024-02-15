@@ -8,7 +8,8 @@ from source.FDataBase import FDataBase
 # Конфигурация БД
 DATABASE = '/tmp/flsite.db'
 DEBUG = True
-SECRET_KEY = os.urandom(12).hex()
+# os.urandom(20).hex()
+SECRET_KEY = '5c4bd6b9f57776acad3fe9f65f8fbf399de5e18f'
 USERNAME = 'admin'
 PASSWORD = '123'
 
@@ -41,6 +42,17 @@ def get_db():
     return g.link_db
 
 
+dbase = None
+
+
+@app.before_request
+def before_request():
+    """Установление соединения с БД пере выполнением запроса"""
+    global dbase
+    db = get_db()
+    dbase = FDataBase(db)
+
+
 @app.teardown_appcontext
 def close_db(error):
     """Закрываем соединение с БД, если оно было установлено"""
@@ -50,16 +62,13 @@ def close_db(error):
 
 @app.route('/')
 def index():
-    db = get_db()
-    dbase = FDataBase(db)
+    """Главная страница"""
     return render_template("index.html", menu=dbase.get_menu(), posts=dbase.get_posts_announce())
 
 
 @app.route("/add_post", methods=["POST", "GET"])
 def add_post():
-    db = get_db()
-    dbase = FDataBase(db)
-
+    """Добавление поста"""
     if request.method == "POST":
         if len(request.form['name']) > 4 and len(request.form['post']) > 10:
             res = dbase.add_post(request.form['name'], request.form['post'], request.form["url"])
@@ -75,25 +84,30 @@ def add_post():
 
 @app.route("/post/<alias>")
 def show_post(alias):
-    db = get_db()
-    dbase = FDataBase(db)
+    """Отдельный пост"""
     title, post = dbase.get_post(alias)
     if not title:
         abort(404)
     return render_template("post.html", menu=dbase.get_menu(), title=title, post=post)
 
 
+@app.route("/login")
+def login():
+    return render_template("login.html", menu=dbase.getMenu(), title="Авторизация")
+
+
+@app.route("/register")
+def register():
+    return render_template("register.html", menu=dbase.getMenu(), title="Регистрация")
+
+
 @app.errorhandler(404)
 def page_not_fount404(error):
-    db = get_db()
-    dbase = FDataBase(db)
     return render_template('page404.html', title="Страница не найдена", menu=dbase.get_menu()), 404
 
 
 @app.errorhandler(401)
 def page_not_fount401(error):
-    db = get_db()
-    dbase = FDataBase(db)
     return render_template('page404.html', title="Нет доступа", menu=dbase.get_menu()), 401
 
 
