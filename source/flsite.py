@@ -1,7 +1,9 @@
 import os
 import sqlite3
 
-from flask import Flask, render_template, g
+from flask import Flask, render_template, g, request, flash, abort
+
+from source.FDataBase import FDataBase
 
 # Конфигурация БД
 DATABASE = '/tmp/flsite.db'
@@ -49,4 +51,52 @@ def close_db(error):
 @app.route('/')
 def index():
     db = get_db()
-    return render_template("index.html", menu=[])
+    dbase = FDataBase(db)
+    return render_template("index.html", menu=dbase.get_menu(), posts=dbase.get_posts_announce())
+
+
+@app.route("/add_post", methods=["POST", "GET"])
+def add_post():
+    db = get_db()
+    dbase = FDataBase(db)
+
+    if request.method == "POST":
+        if len(request.form['name']) > 4 and len(request.form['post']) > 10:
+            res = dbase.add_post(request.form['name'], request.form['post'])
+            if not res:
+                flash('Ошибка добавления статьи', category='error')
+            else:
+                flash('Статья добавлена успешно', category='success')
+        else:
+            flash('Ошибка добавления статьи', category='error')
+
+    return render_template('add_post.html', menu=dbase.get_menu(), title="Добавление статьи")
+
+
+@app.route("/post/<int:post_id>")
+def show_post(post_id):
+    db = get_db()
+    dbase = FDataBase(db)
+    title, post = dbase.get_post(post_id)
+    if not title:
+        abort(404)
+    return render_template("post.html", menu=dbase.get_menu(), title=title, post=post)
+
+
+@app.errorhandler(404)
+def page_not_fount404(error):
+    db = get_db()
+    dbase = FDataBase(db)
+    return render_template('page404.html', title="Страница не найдена", menu=dbase.get_menu()), 404
+
+
+@app.errorhandler(401)
+def page_not_fount401(error):
+    db = get_db()
+    dbase = FDataBase(db)
+    return render_template('page404.html', title="Нет доступа", menu=dbase.get_menu()), 401
+
+
+if __name__ == '__main__':
+    create_db()
+    app.run(debug=True)
